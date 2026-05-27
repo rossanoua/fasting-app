@@ -1,0 +1,315 @@
+/* Telegram theme variables — fall back to sane defaults outside Telegram */
+:root {
+  --tg-bg: var(--tg-theme-bg-color, #ffffff);
+  --tg-text: var(--tg-theme-text-color, #000000);
+  --tg-hint: var(--tg-theme-hint-color, #999999);
+  --tg-link: var(--tg-theme-link-color, #0088cc);
+  --tg-button: var(--tg-theme-button-color, #0088cc);
+  --tg-button-text: var(--tg-theme-button-text-color, #ffffff);
+  --tg-secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
+  --tg-section-bg: var(--tg-theme-section-bg-color, #ffffff);
+  --tg-section-header: var(--tg-theme-section-header-text-color, #6d6d72);
+  --tg-destructive: var(--tg-theme-destructive-text-color, #ff3b30);
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px;
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+header h1 {
+  font-size: 18px;
+  margin: 0 0 12px;
+  text-align: center;
+  color: var(--tg-hint);
+  font-weight: 500;
+}
+
+#tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--tg-secondary-bg);
+  padding: 4px;
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+
+.tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  color: var(--tg-hint);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab.active {
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+.muted { color: var(--tg-hint); font-size: 14px; margin: 8px 0; }
+
+/* ─── IDLE ─── */
+.protocols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.protocol-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  background: var(--tg-secondary-bg);
+  color: var(--tg-text);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.05s;
+}
+
+.protocol-btn:active { transform: scale(0.98); }
+.protocol-btn:focus-visible { outline: none; border-color: var(--tg-button); }
+
+.proto-name { font-size: 22px; font-weight: 700; color: var(--tg-button); }
+.proto-sub { font-size: 12px; color: var(--tg-hint); }
+
+.ghost {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: transparent;
+  color: var(--tg-link);
+  border: none;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+/* ─── ACTIVE TIMER ─── */
+#protocol-label {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--tg-button);
+  margin: 0 0 12px;
+}
+
+.timer-container {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  margin: 0 auto 20px;
+}
+
+.ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring-bg, .ring-fg {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.ring-bg { stroke: var(--tg-secondary-bg); }
+.ring-fg {
+  stroke: var(--tg-button);
+  stroke-dasharray: 565.48; /* 2π × 90 */
+  stroke-dashoffset: 565.48;
+  transition: stroke-dashoffset 0.4s ease, stroke 0.4s;
+}
+
+.ring-fg.complete { stroke: #34c759; }
+
+.timer-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+#timer-elapsed {
+  font-size: 36px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+#timer-target {
+  font-size: 13px;
+}
+
+#progress-bar {
+  height: 6px;
+  background: var(--tg-secondary-bg);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+#progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--tg-button);
+  transition: width 0.4s ease, background 0.4s;
+}
+
+#progress-fill.complete { background: #34c759; }
+
+.phase-label {
+  text-align: center;
+  margin: 8px 0 20px;
+  font-size: 14px;
+}
+
+.phase-label.complete { color: #34c759; font-weight: 600; }
+
+.actions { display: flex; gap: 8px; }
+.actions button { flex: 1; }
+
+button.danger {
+  background: var(--tg-destructive);
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ─── HISTORY ─── */
+#history-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+}
+
+#history-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: var(--tg-secondary-bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.hist-date { font-size: 13px; color: var(--tg-hint); }
+.hist-dur { font-weight: 600; font-variant-numeric: tabular-nums; }
+.hist-dur.completed { color: #34c759; }
+
+/* ─── STATS ─── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.stat-card {
+  background: var(--tg-secondary-bg);
+  padding: 16px;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--tg-button);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--tg-hint);
+  margin-top: 4px;
+}
+
+/* ─── DIALOG ─── */
+dialog {
+  border: none;
+  border-radius: var(--radius);
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  padding: 20px;
+  max-width: 320px;
+}
+
+dialog::backdrop { background: rgba(0,0,0,0.4); }
+
+dialog h3 { margin-top: 0; }
+
+dialog label { display: block; margin: 12px 0; }
+
+dialog input {
+  display: block;
+  margin-top: 6px;
+  padding: 8px 10px;
+  font-size: 16px;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--tg-hint);
+  background: var(--tg-bg);
+  color: var(--tg-text);
+}
+
+dialog menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+dialog button {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+#custom-cancel { background: var(--tg-secondary-bg); color: var(--tg-text); }
+#custom-confirm { background: var(--tg-button); color: var(--tg-button-text); }

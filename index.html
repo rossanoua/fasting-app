@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0088cc">
+<title>Інтервальне голодування</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<main id="app">
+  <header>
+    <h1 id="screen-title">Інтервальне голодування</h1>
+    <nav id="tabs">
+      <button class="tab active" data-tab="timer">Таймер</button>
+      <button class="tab" data-tab="history">Історія</button>
+      <button class="tab" data-tab="stats">Статистика</button>
+    </nav>
+  </header>
+
+  <section id="tab-timer" class="screen active">
+    <div id="idle-view">
+      <p class="muted">Обери протокол щоб почати:</p>
+      <div class="protocols">
+        <button class="protocol-btn" data-hours="16" data-eating="8">
+          <span class="proto-name">16:8</span>
+          <span class="proto-sub">16 год голодування · 8 год їжа</span>
+        </button>
+        <button class="protocol-btn" data-hours="18" data-eating="6">
+          <span class="proto-name">18:6</span>
+          <span class="proto-sub">18 год голодування · 6 год їжа</span>
+        </button>
+        <button class="protocol-btn" data-hours="20" data-eating="4">
+          <span class="proto-name">20:4</span>
+          <span class="proto-sub">Warrior · 4 год вікно</span>
+        </button>
+        <button class="protocol-btn" data-hours="23" data-eating="1">
+          <span class="proto-name">OMAD</span>
+          <span class="proto-sub">One Meal a Day · 23:1</span>
+        </button>
+      </div>
+      <button id="custom-btn" class="ghost">Власний інтервал…</button>
+    </div>
+
+    <div id="active-view" hidden>
+      <p class="muted" id="protocol-label">—</p>
+      <div class="timer-container">
+        <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="ring-bg" cx="100" cy="100" r="90"></circle>
+          <circle class="ring-fg" cx="100" cy="100" r="90"></circle>
+        </svg>
+        <div class="timer-text">
+          <div id="timer-elapsed">00:00:00</div>
+          <div class="muted" id="timer-target">з 16:00:00</div>
+        </div>
+      </div>
+      <div id="progress-bar"><div id="progress-fill"></div></div>
+      <p id="phase-label" class="phase-label">—</p>
+      <div class="actions">
+        <button id="stop-btn" class="danger">Завершити голодування</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-history" class="screen">
+    <p class="muted" id="history-empty">Поки що історія порожня.</p>
+    <ul id="history-list"></ul>
+  </section>
+
+  <section id="tab-stats" class="screen">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-count">0</div>
+        <div class="stat-label">Всього голодувань</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-longest">—</div>
+        <div class="stat-label">Найдовше</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-avg">—</div>
+        <div class="stat-label">У середньому</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-streak">0</div>
+        <div class="stat-label">Поточна серія (днів)</div>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="custom-dialog">
+    <form method="dialog">
+      <h3>Власний інтервал</h3>
+      <label>Години голодування: <input type="number" id="custom-hours" min="1" max="72" value="14" required></label>
+      <menu>
+        <button type="button" id="custom-cancel">Скасувати</button>
+        <button type="submit" id="custom-confirm">Почати</button>
+      </menu>
+    </form>
+  </dialog>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
