@@ -1,0 +1,17 @@
+services:
+  fasting-bot:
+    build: .
+    image: fasting-bot
+    container_name: fasting-bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      # persistent SQLite state — survives container rebuilds
+      - ./data:/app/data
+      # mount sources for hot-edit during dev (comment out for prod)
+      - ./bot.py:/app/bot.py
+      - ./db.py:/app/db.py
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - TZ=Europe/Kyiv
