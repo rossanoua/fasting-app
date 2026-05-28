@@ -48,6 +48,10 @@
     <div id="active-view" hidden>
       <p class="muted" id="protocol-label">—</p>
       <p id="sync-badge" class="sync-badge" hidden></p>
+      <p class="start-time-line">
+        Старт: <span id="start-time-display">--:--</span>
+        <button type="button" id="edit-start-btn" class="icon-btn" title="Змінити час старту">✎</button>
+      </p>
       <div class="timer-container">
         <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
           <circle class="ring-bg" cx="100" cy="100" r="90"></circle>
@@ -62,6 +66,7 @@
       <p id="phase-label" class="phase-label">—</p>
       <div class="actions">
         <button id="stop-btn" class="danger">Завершити голодування</button>
+        <button type="button" id="stop-edit-btn" class="icon-btn-large" title="Завершити в інший час">✎</button>
       </div>
     </div>
   </section>
@@ -280,6 +285,31 @@
 
     <p class="muted footnote">Власник: @rossanoua. Bug-report або feature-request — у GitHub Issues або у чат боту.</p>
   </section>
+
+  <dialog id="time-dialog">
+    <form method="dialog">
+      <h3 id="time-dialog-title">Коли?</h3>
+      <div class="time-presets" id="time-presets">
+        <button type="button" data-offset="0">Зараз</button>
+        <button type="button" data-offset="15">15 хв тому</button>
+        <button type="button" data-offset="30">30 хв тому</button>
+        <button type="button" data-offset="60">1 год тому</button>
+        <button type="button" data-offset="120">2 год тому</button>
+        <button type="button" data-offset="180">3 год тому</button>
+        <button type="button" data-offset="240">4 год тому</button>
+        <button type="button" data-offset="360">6 год тому</button>
+      </div>
+      <label class="custom-time-row">
+        Свій час сьогодні:
+        <input type="time" id="time-dialog-custom" />
+      </label>
+      <p id="time-dialog-error" class="time-dialog-error" hidden></p>
+      <menu>
+        <button type="button" id="time-dialog-cancel">Скасувати</button>
+        <button type="button" id="time-dialog-confirm">Підтвердити</button>
+      </menu>
+    </form>
+  </dialog>
 
   <dialog id="custom-dialog">
     <form method="dialog">

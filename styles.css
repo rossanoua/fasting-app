@@ -437,6 +437,119 @@ button.danger {
   margin: 4px auto 12px;
 }
 
+/* ─── Start time line + edit pencil ─── */
+.start-time-line {
+  text-align: center;
+  font-size: 13px;
+  color: var(--tg-hint);
+  margin: 4px 0 12px;
+}
+
+#start-time-display {
+  font-weight: 600;
+  color: var(--tg-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--tg-link);
+  font-size: 15px;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.icon-btn:active { background: var(--tg-secondary-bg); }
+
+.icon-btn-large {
+  background: var(--tg-secondary-bg);
+  color: var(--tg-link);
+  border: none;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  font-size: 18px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.icon-btn-large:active { transform: scale(0.98); }
+
+/* ─── Time dialog ─── */
+#time-dialog { max-width: 360px; }
+
+.time-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.time-presets button {
+  padding: 10px 8px;
+  background: var(--tg-secondary-bg);
+  color: var(--tg-text);
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.time-presets button:active { transform: scale(0.97); }
+.time-presets button.selected {
+  border-color: var(--tg-button);
+  background: var(--tg-bg);
+  font-weight: 600;
+}
+
+.custom-time-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+
+.custom-time-row input[type="time"] {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--tg-hint);
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-dialog-error {
+  color: #ff3b30;
+  font-size: 13px;
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+#time-dialog menu {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+#time-dialog menu button {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+#time-dialog-cancel { background: var(--tg-secondary-bg); color: var(--tg-text); }
+#time-dialog-confirm { background: var(--tg-button); color: var(--tg-button-text); }
+
 /* ─── DIALOG ─── */
 dialog {
   border: none;

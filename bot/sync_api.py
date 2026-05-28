@@ -144,6 +144,8 @@ def make_sync_handler(bot_token: str, now_ts_fn=None):
             )
 
         action = body.get("action")
+        now = now_ts_fn()
+
         if action == "start":
             protocol = str(body.get("protocol", "")).lower()
             if protocol not in PROTOCOLS:
@@ -152,18 +154,78 @@ def make_sync_handler(bot_token: str, now_ts_fn=None):
                     status=400, headers=cors_headers(),
                 )
             target_h, eating_h = PROTOCOLS[protocol]
+
+            # Optional backdated start (seconds since epoch)
+            start_ts = body.get("start_ts_override")
+            if start_ts is not None:
+                try:
+                    start_ts = int(start_ts)
+                except (TypeError, ValueError):
+                    return web.json_response(
+                        {"ok": False, "error": "invalid start_ts_override"},
+                        status=400, headers=cors_headers(),
+                    )
+                # Reject ridiculous values (more than 7 days in the past or any future)
+                if start_ts > now + 60 or start_ts < now - 7 * 86400:
+                    return web.json_response(
+                        {"ok": False, "error": "start_ts_override out of range"},
+                        status=400, headers=cors_headers(),
+                    )
+            else:
+                start_ts = now
+
             # NOTE: chat_id == user_id for private chats with bot
-            await db.start_fast(user_id, user_id, target_h, eating_h, now_ts_fn())
-            log.info(f"sync start: user={user_id} proto={protocol}")
+            await db.start_fast(user_id, user_id, target_h, eating_h, start_ts)
+            log.info(f"sync start: user={user_id} proto={protocol} "
+                     f"start_ts={start_ts} (offset={now - start_ts}s)")
             return web.json_response(
                 {"ok": True, "synced": "start", "protocol": protocol,
-                 "target_hours": target_h, "eating_hours": eating_h},
+                 "target_hours": target_h, "eating_hours": eating_h,
+                 "start_ts": start_ts},
                 headers=cors_headers(),
             )
 
         if action == "stop":
+            # Optional backdated stop — if the fast was completed at that
+            # point, transition to eating-window tracking instead of plain stop.
+            stop_ts = body.get("stop_ts_override")
+            if stop_ts is not None:
+                try:
+                    stop_ts = int(stop_ts)
+                except (TypeError, ValueError):
+                    return web.json_response(
+                        {"ok": False, "error": "invalid stop_ts_override"},
+                        status=400, headers=cors_headers(),
+                    )
+                if stop_ts > now + 60 or stop_ts < now - 7 * 86400:
+                    return web.json_response(
+                        {"ok": False, "error": "stop_ts_override out of range"},
+                        status=400, headers=cors_headers(),
+                    )
+            else:
+                stop_ts = None
+
+            # Decide: did the user complete the fast at stop_ts?
+            state = await db.get_status(user_id)
+            completed = False
+            if stop_ts and state and state.get("fast_start_ts") and state.get("target_hours"):
+                elapsed = stop_ts - state["fast_start_ts"]
+                if elapsed >= state["target_hours"] * 3600:
+                    completed = True
+
+            if completed:
+                # Mark as completed at stop_ts — eating window starts from there
+                await db.mark_fast_notified(user_id, stop_ts)
+                log.info(f"sync stop (completed): user={user_id} stop_ts={stop_ts}")
+                return web.json_response(
+                    {"ok": True, "synced": "stop", "completed": True,
+                     "eating_started_at": stop_ts},
+                    headers=cors_headers(),
+                )
+
             await db.stop_all(user_id)
-            log.info(f"sync stop: user={user_id}")
+            log.info(f"sync stop: user={user_id} "
+                     f"{'stop_ts=' + str(stop_ts) if stop_ts else ''}")
             return web.json_response(
                 {"ok": True, "synced": "stop"},
                 headers=cors_headers(),

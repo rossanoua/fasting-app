@@ -114,6 +114,109 @@ tabs.forEach((tab) => {
   });
 });
 
+/* ─── Time picker dialog (backdating start/stop) ─── */
+
+const timeDialog = document.getElementById("time-dialog");
+const timePresetsEl = document.getElementById("time-presets");
+const timeCustomInput = document.getElementById("time-dialog-custom");
+const timeErrorEl = document.getElementById("time-dialog-error");
+const timeTitleEl = document.getElementById("time-dialog-title");
+
+let timeDialogContext = null;
+// { mode: 'start' | 'stop', minTs?: number, onConfirm: (ts: number) => void }
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function fmtHHMM(ts) {
+  const d = new Date(ts);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function clearPresetSelection() {
+  timePresetsEl.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+}
+
+function resolveSelectedTs() {
+  // Returns timestamp from either selected preset or custom input.
+  const selPreset = timePresetsEl.querySelector("button.selected");
+  if (selPreset) {
+    const offsetMin = Number(selPreset.dataset.offset);
+    return Date.now() - offsetMin * 60_000;
+  }
+  const raw = timeCustomInput.value;
+  if (raw && /^\d{2}:\d{2}$/.test(raw)) {
+    const [h, m] = raw.split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    // If the chosen time is in the future, assume it was yesterday
+    if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1);
+    return d.getTime();
+  }
+  return null;
+}
+
+function openTimeDialog(ctx) {
+  timeDialogContext = ctx;
+  timeTitleEl.textContent =
+    ctx.mode === "start" ? "Коли почав голодувати?" : "Коли завершив?";
+  clearPresetSelection();
+  // Pre-select "Зараз" by default
+  const nowBtn = timePresetsEl.querySelector('[data-offset="0"]');
+  if (nowBtn) nowBtn.classList.add("selected");
+  timeCustomInput.value = fmtHHMM(Date.now());
+  timeErrorEl.hidden = true;
+  if (typeof timeDialog.showModal === "function") timeDialog.showModal();
+  else {
+    // Old browser fallback — minutes ago via prompt()
+    const mins = parseInt(prompt(`${timeTitleEl.textContent} (хв тому, 0 = зараз):`, "0"), 10);
+    if (!isNaN(mins) && mins >= 0) ctx.onConfirm(Date.now() - mins * 60_000);
+    timeDialogContext = null;
+  }
+}
+
+timePresetsEl.addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-offset]");
+  if (!btn) return;
+  clearPresetSelection();
+  btn.classList.add("selected");
+  // Also reflect into custom input for visual confirmation
+  const offsetMin = Number(btn.dataset.offset);
+  timeCustomInput.value = fmtHHMM(Date.now() - offsetMin * 60_000);
+});
+
+timeCustomInput.addEventListener("input", clearPresetSelection);
+
+document.getElementById("time-dialog-cancel").addEventListener("click", () => {
+  timeDialog.close();
+  timeDialogContext = null;
+});
+
+document.getElementById("time-dialog-confirm").addEventListener("click", () => {
+  if (!timeDialogContext) { timeDialog.close(); return; }
+  const ts = resolveSelectedTs();
+  if (ts == null) {
+    timeErrorEl.textContent = "Обери preset або введи час.";
+    timeErrorEl.hidden = false;
+    return;
+  }
+  // Validate against minimum (stop must be after start)
+  if (timeDialogContext.minTs != null && ts < timeDialogContext.minTs) {
+    timeErrorEl.textContent = "Час до старту голодування.";
+    timeErrorEl.hidden = false;
+    return;
+  }
+  // Validate not in the future
+  if (ts > Date.now() + 60_000) {
+    timeErrorEl.textContent = "Час у майбутньому.";
+    timeErrorEl.hidden = false;
+    return;
+  }
+  const ctx = timeDialogContext;
+  timeDialogContext = null;
+  timeDialog.close();
+  ctx.onConfirm(ts);
+});
+
 /* ─── Bot sync (soft-fail) ─── */
 
 function protocolKey(targetHours, eatingHours) {
@@ -123,6 +226,9 @@ function protocolKey(targetHours, eatingHours) {
   };
   return m[`${targetHours}_${eatingHours}`] || null;
 }
+
+/* Sync helper — wraps timestamp into ISO seconds when overrides present */
+function tsToSec(ts) { return Math.floor(ts / 1000); }
 
 async function syncToBot(action, body = {}) {
   if (!CONFIG.botSyncUrl || !tg?.initData) {
@@ -175,20 +281,35 @@ function updateSyncBadge(state) {
 }
 
 /* ─── Start a fast ─── */
-async function startFast(targetHours, eatingHours) {
-  const active = {
-    startTs: Date.now(),
-    targetHours,
-    eatingHours,
-  };
+async function startFast(targetHours, eatingHours, startTs = Date.now()) {
+  const active = { startTs, targetHours, eatingHours };
   await saveActive(active);
   showActive(active);
-  // Fire-and-forget sync to bot for reminder scheduling
   const proto = protocolKey(targetHours, eatingHours);
   if (proto) {
-    syncToBot("start", { protocol: proto }).then((r) => {
+    const payload = { protocol: proto };
+    if (startTs !== Date.now() && Math.abs(Date.now() - startTs) > 60_000) {
+      payload.start_ts_override = tsToSec(startTs);
+    }
+    syncToBot("start", payload).then((r) => {
       updateSyncBadge(r.ok ? "ok" : "fail");
     });
+  }
+}
+
+/* ─── Edit start time of active fast (retroactive) ─── */
+async function editStartTime(newStartTs) {
+  const active = await loadActive();
+  if (!active) return;
+  active.startTs = newStartTs;
+  await saveActive(active);
+  showActive(active);
+  const proto = protocolKey(active.targetHours, active.eatingHours);
+  if (proto) {
+    syncToBot("start", {
+      protocol: proto,
+      start_ts_override: tsToSec(newStartTs),
+    }).then((r) => updateSyncBadge(r.ok ? "ok" : "fail"));
   }
 }
 
@@ -198,6 +319,27 @@ document.querySelectorAll(".protocol-btn").forEach((btn) => {
     const e = Number(btn.dataset.eating);
     await startFast(h, e);
     tg?.HapticFeedback?.impactOccurred?.("medium");
+  });
+});
+
+/* Edit start time pencil */
+document.getElementById("edit-start-btn").addEventListener("click", async () => {
+  const active = await loadActive();
+  if (!active) return;
+  openTimeDialog({
+    mode: "start",
+    onConfirm: (newTs) => editStartTime(newTs),
+  });
+});
+
+/* Backdated stop pencil */
+document.getElementById("stop-edit-btn").addEventListener("click", async () => {
+  const active = await loadActive();
+  if (!active) return;
+  openTimeDialog({
+    mode: "stop",
+    minTs: active.startTs,
+    onConfirm: (endTs) => finishFast(active, endTs),
   });
 });
 
@@ -245,18 +387,22 @@ document.getElementById("stop-btn").addEventListener("click", async () => {
   }
 });
 
-async function finishFast(active) {
+async function finishFast(active, endTs = Date.now()) {
   const history = await loadHistory();
   history.push({
     startTs: active.startTs,
-    endTs: Date.now(),
+    endTs,
     targetHours: active.targetHours,
   });
   await saveHistory(history);
   await saveActive(null);
   showIdle();
   tg?.HapticFeedback?.notificationOccurred?.("success");
-  syncToBot("stop").then((r) => {
+  const payload = {};
+  if (Math.abs(Date.now() - endTs) > 60_000) {
+    payload.stop_ts_override = tsToSec(endTs);
+  }
+  syncToBot("stop", payload).then((r) => {
     updateSyncBadge(r.ok ? null : "fail");
   });
 }
@@ -275,6 +421,7 @@ function showActive(active) {
   document.getElementById("active-view").hidden = false;
   document.getElementById("protocol-label").textContent =
     `Протокол ${active.targetHours}:${active.eatingHours}`;
+  document.getElementById("start-time-display").textContent = fmtHHMM(active.startTs);
   renderTick(active);
   if (tickHandle) clearInterval(tickHandle);
   tickHandle = setInterval(() => renderTick(active), 1000);
