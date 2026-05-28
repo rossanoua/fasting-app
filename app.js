@@ -10,7 +10,20 @@
  *  State model:
  *    activeFast: { startTs: number, targetHours: number, eatingHours: number } | null
  *    history:    Array<{ startTs: number, endTs: number, targetHours: number }>
+ *
+ *  Bot sync (optional, soft fail):
+ *    When BOT_SYNC_URL is set and we're inside Telegram (initData present),
+ *    every start/stop is mirrored to the bot via POST /api/sync so that
+ *    push notifications fire automatically.
  * ────────────────────────────────────────────────────────── */
+
+const CONFIG = {
+  // Cloudflare Tunnel URL pointing to bot's /api/sync endpoint.
+  // Leave empty to disable sync — Mini App works standalone with CloudStorage.
+  // To enable: deploy bot/ + cloudflared, paste the public hostname here, redeploy.
+  botSyncUrl: "",  // e.g. "https://fasting-bot.example.com" or "https://abc-xyz.trycloudflare.com"
+  botDeepLink: "https://t.me/fasting_tracker_ua_bot",
+};
 
 const tg = window.Telegram?.WebApp;
 tg?.ready();
@@ -101,6 +114,66 @@ tabs.forEach((tab) => {
   });
 });
 
+/* ─── Bot sync (soft-fail) ─── */
+
+function protocolKey(targetHours, eatingHours) {
+  // Map (target, eating) → short bot protocol key.
+  const m = {
+    "16_8": "16", "18_6": "18", "20_4": "20", "23_1": "omad",
+  };
+  return m[`${targetHours}_${eatingHours}`] || null;
+}
+
+async function syncToBot(action, body = {}) {
+  if (!CONFIG.botSyncUrl || !tg?.initData) {
+    // Sync not configured or not inside Telegram — no-op
+    return { ok: false, reason: "sync-disabled" };
+  }
+  try {
+    const url = CONFIG.botSyncUrl.replace(/\/+$/, "") + "/api/sync";
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Telegram-Init-Data": tg.initData,
+      },
+      body: JSON.stringify({ action, ...body }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && data.ok) {
+      console.log("[sync]", action, "OK");
+      return { ok: true, ...data };
+    }
+    console.warn("[sync] failed:", resp.status, data);
+    return { ok: false, status: resp.status, ...data };
+  } catch (e) {
+    console.warn("[sync] error:", e.message);
+    return { ok: false, error: e.message };
+  }
+}
+
+function updateSyncBadge(state) {
+  const el = document.getElementById("sync-badge");
+  if (!el) return;
+  if (!CONFIG.botSyncUrl) {
+    el.textContent = "";
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  if (state === "ok") {
+    el.textContent = "🔔 Нагадування активні";
+    el.className = "sync-badge ok";
+  } else if (state === "fail") {
+    el.textContent = "⚠️ Бот недоступний";
+    el.className = "sync-badge fail";
+  } else {
+    el.textContent = "";
+    el.className = "sync-badge";
+  }
+}
+
 /* ─── Start a fast ─── */
 async function startFast(targetHours, eatingHours) {
   const active = {
@@ -110,6 +183,13 @@ async function startFast(targetHours, eatingHours) {
   };
   await saveActive(active);
   showActive(active);
+  // Fire-and-forget sync to bot for reminder scheduling
+  const proto = protocolKey(targetHours, eatingHours);
+  if (proto) {
+    syncToBot("start", { protocol: proto }).then((r) => {
+      updateSyncBadge(r.ok ? "ok" : "fail");
+    });
+  }
 }
 
 document.querySelectorAll(".protocol-btn").forEach((btn) => {
@@ -176,6 +256,9 @@ async function finishFast(active) {
   await saveActive(null);
   showIdle();
   tg?.HapticFeedback?.notificationOccurred?.("success");
+  syncToBot("stop").then((r) => {
+    updateSyncBadge(r.ok ? null : "fail");
+  });
 }
 
 /* ─── Timer rendering loop ─── */
@@ -323,4 +406,14 @@ async function renderStats() {
   } else {
     console.log("[fasting] Using Telegram CloudStorage");
   }
+
+  // Wire up donation buttons (in FAQ tab) — open bot chat
+  document.querySelectorAll("[data-bot-cmd]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const cmd = btn.dataset.botCmd;
+      const url = `${CONFIG.botDeepLink}?start=${cmd}`;
+      if (tg?.openTelegramLink) tg.openTelegramLink(url);
+      else window.open(url, "_blank");
+    });
+  });
 })();

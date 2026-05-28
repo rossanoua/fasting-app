@@ -4,7 +4,7 @@ Telegram bot що нагадує:
 - 🎯 коли голодування завершено (можна їсти)
 - ⏰ коли вікно їжі зачинилось (пора голодувати знову)
 
-Працює паралельно з Mini App (візуальний таймер). Mini App = візуальний UI, bot = напомінання.
+Працює паралельно з Mini App (візуальний таймер). Mini App = візуальний UI, bot = нагадування.
 
 ## Стек
 
@@ -19,7 +19,18 @@ Telegram bot що нагадує:
 - `/16 /18 /20 /omad` — стартонути напряму
 - `/status` — поточний стан + час що лишився
 - `/stop` — припинити поточний таймер
+- `/can` — що можна/не можна під час голодування
+- `/donate` — підтримати розробку (Telegram Stars)
 - `/help` — довідка
+
+## Mini App ↔ Bot sync
+
+Коли користувач тисне 16:8 у Mini App, він POST'ить через Cloudflare Tunnel
+на `https://<your-tunnel>/api/sync` з підписаним `initData` (HMAC-SHA256).
+Бот валідує підпис, стартує таймер у SQLite, планує нагадування.
+
+Це означає що **користувач тисне один раз** (у Mini App або у боті — байдуже),
+і нагадування приходять автоматично.
 
 ## Setup (5 хв)
 
@@ -37,15 +48,53 @@ cp .env.example .env
 # Відкрий .env, встав свій BOT_TOKEN
 ```
 
-### 3. Запуск
+### 3. Cloudflare Tunnel setup (для Mini App sync)
+
+Потрібно один раз створити tunnel у Cloudflare щоб Mini App міг достукатись до бота через HTTPS.
+
+**3.1. Зайди на https://one.dash.cloudflare.com/ → Networks → Tunnels → Create a tunnel**
+
+- Tunnel type: Cloudflared
+- Name: `fasting-bot` (або будь-яке)
+- Save → скопіюй **Tunnel token** (довгий рядок eyJ...)
+
+**3.2. У Public Hostname секції:**
+- Subdomain: будь-який (напр. `fasting-bot`)
+- Domain: твій CF-домен АБО `*.trycloudflare.com` (free, без власного домену)
+- Type: HTTP
+- URL: `fasting-bot:8080`  ← це docker service name + port
+
+**3.3. Запиши token у .env:**
+```
+TUNNEL_TOKEN=eyJ...весь_token_сюди...
+```
+
+**3.4. Запам'ятай публічний URL** (типу `https://fasting-bot.example.com` або `https://abc-xyz-123.trycloudflare.com`) — потім вставимо у Mini App конфіг.
+
+### 4. Запуск бота + tunnel
 
 ```bash
 docker compose up -d --build
-# Перевір логи:
-docker compose logs -f fasting-bot
+# Перевір логи обох сервісів:
+docker compose logs -f
 ```
 
-Має побачити `scheduler started, polling Telegram...`.
+Має побачити:
+- `fasting-bot ... sync API on 0.0.0.0:8080`
+- `fasting-bot ... scheduler started, polling Telegram...`
+- `cloudflared ... Registered tunnel connection`
+
+### 5. Налаштування Mini App для sync
+
+Відкрий `app.js` у repo root → знайди `CONFIG.botSyncUrl` → встав свій публічний URL з кроку 3.4 → закомить + push. GitHub Pages підхопить за ~1 хв.
+
+Без цього кроку Mini App працює standalone (CloudStorage), але без нагадувань — бо не знає куди POST'ити.
+
+### 6. Smoke test
+
+- Відкрий `https://<your-tunnel-url>/health` у браузері → має відповісти `{"ok":true}`
+- У Telegram → бот → `/start` → натисни 16:8 → отримуєш `✅ Старт...`
+- Mini App: відкрий → натисни 16:8 → під таймером має зʼявитись `🔔 Нагадування активні`
 
 ### 4. Тест
 
@@ -118,7 +167,9 @@ State machine на одного user'а:
 
 ## Roadmap
 
-- [ ] Unified state з Mini App (Mini App POST'ить у bot HTTPS endpoint при старті) — щоб не треба було стартувати таймер двічі
+- [x] **Unified state з Mini App** — done. Mini App POST'ить у `/api/sync` через Cloudflare Tunnel.
+- [x] **Telegram Stars donate** — `/donate` команда + inline buttons + автоматичний "дякую" при successful_payment.
 - [ ] Stats: weekly summary "🏆 5 голодувань цього тижня, серія 5 днів"
 - [ ] Кастомні нагадування ("за 30 хв до завершення")
+- [ ] Підтримка кастомних протоколів (не тільки 16/18/20/omad)
 - [ ] Multi-user аналітика для адміна (просто `/admin stats`)

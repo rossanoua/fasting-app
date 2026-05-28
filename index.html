@@ -47,6 +47,7 @@
 
     <div id="active-view" hidden>
       <p class="muted" id="protocol-label">—</p>
+      <p id="sync-badge" class="sync-badge" hidden></p>
       <div class="timer-container">
         <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
           <circle class="ring-bg" cx="100" cy="100" r="90"></circle>
@@ -185,32 +186,26 @@
       </div>
     </details>
 
-    <h3 class="faq-group">🔔 Бот та напомінання</h3>
+    <h3 class="faq-group">🔔 Бот та нагадування</h3>
 
     <details class="faq">
-      <summary>Звідки приходять push-напомінання?</summary>
+      <summary>Звідки приходять push-нагадування?</summary>
       <div class="faq-body">
-        Окремий компонент — Telegram бот <b>@fasting_tracker_ua_bot</b>. Він живе у Docker контейнері на сервері власника, використовує Telegram Bot API через long-polling, зберігає таймери у SQLite на тому ж сервері.
+        Окремий компонент — Telegram бот <b>@fasting_tracker_ua_bot</b>. Він живе у Docker контейнері на окремому хості, використовує Telegram Bot API через long-polling, зберігає таймери у SQLite.
       </div>
     </details>
 
     <details class="faq">
       <summary>Бот бачить мою історію з Mini App?</summary>
       <div class="faq-body">
-        <b>Ні.</b> Бот і Mini App — зараз окремі системи з окремим storage:
-        <br>• Mini App → CloudStorage (Telegram)
-        <br>• Бот → SQLite на сервері власника
-        <br><br>
-        Бот бачить тільки команди які ти йому пишеш у чат (<code>/16</code>, <code>/stop</code> тощо). Mini App історію — не бачить.
+        Бот бачить тільки <b>поточний</b> активний таймер (старт + протокол) — щоб знати коли надсилати нагадування. Повна історія голодувань залишається тільки у твоєму CloudStorage. Бот не зберігає і не бачить минулі сесії.
       </div>
     </details>
 
     <details class="faq">
-      <summary>Чому два таймери (у Mini App і в боті) роздільні?</summary>
+      <summary>Як Mini App "розповідає" боту про старт?</summary>
       <div class="faq-body">
-        Це поточне обмеження архітектури. Mini App клікнуто 16:8 → візуальний таймер у Mini App. Щоб отримати <i>напомінання</i> — треба також натиснути 16:8 у боті.
-        <br><br>
-        Roadmap: unified state через HTTPS endpoint на боті щоб Mini App автоматично синхронізував стан з ботом.
+        Коли тиснеш 16:8 у Mini App, він POST'ить запит на HTTPS endpoint бота (через Cloudflare Tunnel) з твоїм підписаним <code>initData</code>. Бот валідує підпис через HMAC-SHA256 (стандарт Telegram), дістає user_id, і планує нагадування. Якщо бот недоступний — Mini App продовжує працювати локально (таймер + історія), але без нагадувань. У такому випадку зверху таймера зʼявляється <i>«⚠️ Бот недоступний»</i>.
       </div>
     </details>
 
@@ -223,7 +218,7 @@
         <br><br>
         <b>Bot:</b> Python 3.12, aiogram 3, SQLite, APScheduler. Docker з <code>restart: always</code>.
         <br><br>
-        <b>Hosting:</b> Mini App — GitHub Pages (статика). Bot — Docker на сервері власника.
+        <b>Hosting:</b> Mini App — GitHub Pages (статика). Bot — Docker контейнер на окремому хості (long-polling, не webhook).
       </div>
     </details>
 
@@ -255,23 +250,31 @@
     <details class="faq">
       <summary>Чи безкоштовно? Чи буде платно?</summary>
       <div class="faq-body">
-        Для тебе — повністю безкоштовно і так і залишиться. Витрати власника мінімальні:
-        <br>• Telegram Bot API — free
-        <br>• GitHub Pages — free
-        <br>• CloudStorage — free (Telegram оплачує)
-        <br>• Сервер для бота — на існуючому домашньому
+        Для тебе — повністю безкоштовно і так і залишиться. Витрати на хостинг покриваються з власних коштів. Якщо хочеш долучитись — див. <b>«Підтримати»</b> нижче.
+      </div>
+    </details>
+
+    <details class="faq" open>
+      <summary>💛 Підтримати розробку</summary>
+      <div class="faq-body">
+        Бот і Mini App — open source, безкоштовні. Якщо допомогли тобі і хочеш покрити частину витрат на хостинг або просто сказати «дякую» — є <b>Telegram Stars</b> через бота:
+        <br><br>
+        <button class="donate-btn" data-bot-cmd="donate">⭐ Підтримати через Stars</button>
+        <br>
+        <span class="muted" style="font-size:12px">Stars йдуть напряму через Telegram, без посередників, без передачі карткових даних.</span>
       </div>
     </details>
 
     <details class="faq">
       <summary>Що в roadmap?</summary>
       <div class="faq-body">
-        • Unified state: Mini App ↔ bot sync (один таймер, не два)
+        <s>Unified state Mini App ↔ bot sync</s> — ✅ зроблено
         <br>• Кнопка "Видалити всі дані" у Mini App
         <br>• Експорт історії у CSV
         <br>• Графіки за тиждень/місяць
         <br>• Share streak у чат через <code>shareMessage()</code>
         <br>• Більше протоколів (5:2, Eat-Stop-Eat)
+        <br>• Підтримка кастомних інтервалів у боті (не тільки 16/18/20/omad)
       </div>
     </details>
 

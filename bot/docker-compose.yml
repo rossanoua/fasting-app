@@ -12,6 +12,24 @@ services:
       # mount sources for hot-edit during dev (comment out for prod)
       - ./bot.py:/app/bot.py
       - ./db.py:/app/db.py
+      - ./sync_api.py:/app/sync_api.py
+    ports:
+      # Expose sync API on localhost only — Cloudflare Tunnel reaches it
+      # via the docker network. NEVER expose 0.0.0.0 publicly.
+      - "127.0.0.1:8080:8080"
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - TZ=Europe/Kyiv
+
+  # Cloudflare Tunnel — exposes fasting-bot:8080 to the public internet
+  # over HTTPS via *.trycloudflare.com (or your custom hostname).
+  # Set TUNNEL_TOKEN in .env after creating the tunnel in Cloudflare dashboard.
+  # See bot/README.md for the one-time setup steps.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    depends_on:
+      - fasting-bot
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    env_file:
+      - .env

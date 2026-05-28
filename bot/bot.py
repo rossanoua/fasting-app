@@ -27,10 +27,13 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (CallbackQuery, InlineKeyboardButton,
-                            InlineKeyboardMarkup, Message)
+                            InlineKeyboardMarkup, LabeledPrice, Message,
+                            PreCheckoutQuery)
+from aiohttp import web
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 import db
+import sync_api
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,6 +49,9 @@ if not BOT_TOKEN:
 MINI_APP_URL = os.environ.get(
     "MINI_APP_URL", "https://rossanoua.github.io/fasting-app/"
 ).strip()
+
+SYNC_API_PORT = int(os.environ.get("SYNC_API_PORT", "8080"))
+SYNC_API_HOST = os.environ.get("SYNC_API_HOST", "0.0.0.0")
 
 PROTOCOLS = {
     "16": (16, 8, "16:8 — класика, 16 год голодування + 8 год вікно"),
@@ -96,6 +102,18 @@ def protocol_keyboard() -> InlineKeyboardMarkup:
 
 # ─── Handlers ─────────────────────────────────────────────────────────
 
+@dp.message(CommandStart(deep_link=True))
+async def cmd_start_with_param(msg: Message) -> None:
+    # Deep-link payload e.g. "/start donate" comes from Mini App donation button
+    arg = (msg.text or "").split(maxsplit=1)
+    payload = arg[1].strip() if len(arg) > 1 else ""
+    if payload == "donate":
+        await cmd_donate(msg)
+        return
+    # Unknown payload — fall through to default welcome
+    await cmd_start(msg)
+
+
 @dp.message(CommandStart())
 async def cmd_start(msg: Message) -> None:
     await msg.answer(
@@ -114,10 +132,72 @@ async def cmd_help(msg: Message) -> None:
         "/status — поточний стан\n"
         "/stop — припинити поточний таймер\n"
         "/can — що можна/не можна під час голодування\n"
+        "/donate — підтримати розробку (Telegram Stars)\n"
         "/help — ця довідка\n\n"
         f"<b>Візуальний таймер:</b> {MINI_APP_URL}",
         reply_markup=protocol_keyboard(),
     )
+
+
+# ─── Donation: Telegram Stars (XTR) ───────────────────────────────────
+
+DONATION_OPTIONS = [
+    (50, "Кава автору ☕"),
+    (150, "Місяць хостингу 🌱"),
+    (500, "Велика підтримка ❤️"),
+]
+
+
+def donate_keyboard() -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text=f"⭐ {n} — {label}",
+                                    callback_data=f"donate:{n}")]
+            for n, label in DONATION_OPTIONS]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@dp.message(Command("donate"))
+async def cmd_donate(msg: Message) -> None:
+    await msg.answer(
+        "💛 <b>Дякую що думаєш про підтримку!</b>\n\n"
+        "Цей бот — open source, безкоштовний і таким залишиться. "
+        "Якщо хочеш покрити частину витрат на хостинг або просто "
+        "сказати «дякую» — обери суму в Telegram Stars:\n\n"
+        "<i>Stars йдуть напряму через Telegram, без посередників, "
+        "без передачі карткових даних. Виводяться у TON crypto автору.</i>",
+        reply_markup=donate_keyboard(),
+    )
+
+
+@dp.callback_query(F.data.startswith("donate:"))
+async def cb_donate(cb: CallbackQuery) -> None:
+    amount = int(cb.data.split(":", 1)[1])
+    label_match = next((l for n, l in DONATION_OPTIONS if n == amount),
+                       "Підтримка")
+    await cb.message.answer_invoice(
+        title="Підтримка fasting tracker",
+        description=label_match,
+        payload=f"donate-{amount}",
+        currency="XTR",
+        prices=[LabeledPrice(label=f"{amount} ⭐", amount=amount)],
+        # provider_token can be empty for Stars (XTR currency)
+        provider_token="",
+    )
+    await cb.answer()
+
+
+@dp.pre_checkout_query()
+async def pre_checkout(query: PreCheckoutQuery) -> None:
+    # Always confirm — payment validation is handled by Telegram for Stars
+    await query.answer(ok=True)
+
+
+@dp.message(F.successful_payment)
+async def successful_payment(msg: Message) -> None:
+    amount = msg.successful_payment.total_amount
+    await msg.answer(
+        f"❤️ Дякую за {amount} ⭐! Це реально допомагає тримати бот живим.",
+    )
+    log.info(f"successful donation: user={msg.from_user.id} amount={amount}")
 
 
 @dp.message(Command("can"))
@@ -166,7 +246,7 @@ async def start_protocol(user_id: int, chat_id: int, proto_key: str,
     await db.start_fast(user_id, chat_id, target_hours, eating_hours, now_ts())
     await message.answer(
         f"✅ Старт <b>{descr}</b>.\n\n"
-        f"⏰ Напомню через <b>{target_hours} год</b> коли можна їсти.\n"
+        f"⏰ Нагадаю через <b>{target_hours} год</b> коли можна їсти.\n"
         f"🍽 Потім через <b>{eating_hours} год</b> — коли пора голодувати знову.",
         reply_markup=protocol_keyboard(),
     )
@@ -247,7 +327,7 @@ async def reminder_tick() -> None:
                 u["chat_id"],
                 f"🎯 <b>Голодування завершено!</b>\n\n"
                 f"Можеш починати їсти. Вікно — {u['eating_hours']} год.\n"
-                f"Напомню коли пора знову голодувати."
+                f"Нагадаю коли пора знову голодувати."
             )
             await db.mark_fast_notified(u["user_id"], now)
             log.info(f"sent fast-done notification to user {u['user_id']}")
@@ -273,14 +353,26 @@ async def reminder_tick() -> None:
 
 async def main() -> None:
     await db.init()
+
+    # Background tick: check due reminders every 60s
     scheduler = AsyncIOScheduler()
     scheduler.add_job(reminder_tick, "interval", seconds=60, max_instances=1)
     scheduler.start()
+
+    # HTTP sync API (Mini App ↔ bot)
+    sync_app = sync_api.build_app(BOT_TOKEN)
+    runner = web.AppRunner(sync_app)
+    await runner.setup()
+    site = web.TCPSite(runner, SYNC_API_HOST, SYNC_API_PORT)
+    await site.start()
+    log.info(f"sync API on {SYNC_API_HOST}:{SYNC_API_PORT}")
+
     log.info("scheduler started, polling Telegram...")
     try:
         await dp.start_polling(bot)
     finally:
         scheduler.shutdown(wait=False)
+        await runner.cleanup()
         await bot.session.close()
 
 
