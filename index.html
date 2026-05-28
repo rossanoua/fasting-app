@@ -15,8 +15,9 @@
     <nav id="tabs">
       <button class="tab active" data-tab="timer">Таймер</button>
       <button class="tab" data-tab="history">Історія</button>
-      <button class="tab" data-tab="stats">Статистика</button>
+      <button class="tab" data-tab="stats">Стат.</button>
       <button class="tab" data-tab="can">Можна?</button>
+      <button class="tab" data-tab="faq">FAQ</button>
     </nav>
   </header>
 
@@ -140,6 +141,141 @@
     </div>
 
     <p class="muted footnote">Не медична порада. Якщо є діабет, вагітність, розлади харчової поведінки — консультація з лікарем перед IF.</p>
+  </section>
+
+  <section id="tab-faq" class="screen">
+    <p class="muted intro">Як це працює технічно — дані, синхронізація, бот, приватність.</p>
+
+    <h3 class="faq-group">🔐 Дані та приватність</h3>
+
+    <details class="faq">
+      <summary>Де зберігається моя історія?</summary>
+      <div class="faq-body">
+        У <b>Telegram CloudStorage</b> — безкоштовному хмарному сховищі Telegram, до 1024 записів на користувача. Дані прив'язані до твого Telegram-аккаунта.
+        <br><br>
+        Якщо відкриваєш app поза Telegram (з браузера) — fallback на <code>localStorage</code> браузера, тільки локально на цьому пристрої.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Хто бачить мої дані?</summary>
+      <div class="faq-body">
+        Тільки ти. CloudStorage шифрує дані на стороні Telegram; розробник app не має до них доступу. Сервери Telegram бачать тільки encrypted blob'и під твоїм Telegram ID.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Чи синхронізуються дані між моїми пристроями?</summary>
+      <div class="faq-body">
+        Так, автоматично. Відкрий app на телефоні + у Telegram Desktop → побачиш той самий поточний таймер і ту саму історію. Sync — частина CloudStorage.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Що буде якщо очистити кеш Telegram чи переустановити?</summary>
+      <div class="faq-body">
+        Історія залишиться. CloudStorage живе на серверах Telegram, не локально. При наступному вході — підвантажиться знову.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Як видалити всі мої дані?</summary>
+      <div class="faq-body">
+        Кнопки "видалити все" ще нема (TODO). Зараз можна вручну: написати @BotFather → <code>/deletewebappdata</code> — очистить CloudStorage для цього app. Або з браузера: відкрити URL → DevTools → Application → Local Storage → Clear.
+      </div>
+    </details>
+
+    <h3 class="faq-group">🔔 Бот та напомінання</h3>
+
+    <details class="faq">
+      <summary>Звідки приходять push-напомінання?</summary>
+      <div class="faq-body">
+        Окремий компонент — Telegram бот <b>@fasting_tracker_ua_bot</b>. Він живе у Docker контейнері на сервері власника, використовує Telegram Bot API через long-polling, зберігає таймери у SQLite на тому ж сервері.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Бот бачить мою історію з Mini App?</summary>
+      <div class="faq-body">
+        <b>Ні.</b> Бот і Mini App — зараз окремі системи з окремим storage:
+        <br>• Mini App → CloudStorage (Telegram)
+        <br>• Бот → SQLite на сервері власника
+        <br><br>
+        Бот бачить тільки команди які ти йому пишеш у чат (<code>/16</code>, <code>/stop</code> тощо). Mini App історію — не бачить.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Чому два таймери (у Mini App і в боті) роздільні?</summary>
+      <div class="faq-body">
+        Це поточне обмеження архітектури. Mini App клікнуто 16:8 → візуальний таймер у Mini App. Щоб отримати <i>напомінання</i> — треба також натиснути 16:8 у боті.
+        <br><br>
+        Roadmap: unified state через HTTPS endpoint на боті щоб Mini App автоматично синхронізував стан з ботом.
+      </div>
+    </details>
+
+    <h3 class="faq-group">🛠 Стек і код</h3>
+
+    <details class="faq">
+      <summary>Який стек?</summary>
+      <div class="faq-body">
+        <b>Mini App:</b> vanilla HTML + JavaScript + CSS. Нуль dependencies, нуль build step. ~640 рядків коду.
+        <br><br>
+        <b>Bot:</b> Python 3.12, aiogram 3, SQLite, APScheduler. Docker з <code>restart: always</code>.
+        <br><br>
+        <b>Hosting:</b> Mini App — GitHub Pages (статика). Bot — Docker на сервері власника.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Open source? Можна fork'нути?</summary>
+      <div class="faq-body">
+        Repo приватний на github.com/rossanoua/fasting-app. Якщо хочеш forka — пиши власнику.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Як працює таймер коли app закритий?</summary>
+      <div class="faq-body">
+        Mini App нічого не робить коли закритий — це звичайна веб-сторінка. Зберігається timestamp старту. При наступному відкритті: <code>elapsed = now - start</code>. Тому таймер завжди точний — навіть якщо app не відкривати тиждень.
+        <br><br>
+        Напомінання приходять незалежно від того чи відкритий app — їх шле бот зі свого розкладу.
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Чи треба інтернет?</summary>
+      <div class="faq-body">
+        Для першого завантаження сторінки — так. Після — Telegram кешує WebApp файли. Активний таймер працює offline (timestamp у CloudStorage). Sync між пристроями — при першому online connection.
+      </div>
+    </details>
+
+    <h3 class="faq-group">💰 Гроші та плани</h3>
+
+    <details class="faq">
+      <summary>Чи безкоштовно? Чи буде платно?</summary>
+      <div class="faq-body">
+        Для тебе — повністю безкоштовно і так і залишиться. Витрати власника мінімальні:
+        <br>• Telegram Bot API — free
+        <br>• GitHub Pages — free
+        <br>• CloudStorage — free (Telegram оплачує)
+        <br>• Сервер для бота — на існуючому домашньому
+      </div>
+    </details>
+
+    <details class="faq">
+      <summary>Що в roadmap?</summary>
+      <div class="faq-body">
+        • Unified state: Mini App ↔ bot sync (один таймер, не два)
+        <br>• Кнопка "Видалити всі дані" у Mini App
+        <br>• Експорт історії у CSV
+        <br>• Графіки за тиждень/місяць
+        <br>• Share streak у чат через <code>shareMessage()</code>
+        <br>• Більше протоколів (5:2, Eat-Stop-Eat)
+      </div>
+    </details>
+
+    <p class="muted footnote">Власник: @rossanoua. Bug-report або feature-request — у GitHub Issues або у чат боту.</p>
   </section>
 
   <dialog id="custom-dialog">

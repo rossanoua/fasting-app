@@ -323,6 +323,72 @@ button.danger {
   padding: 0 8px;
 }
 
+/* ─── FAQ TAB ─── */
+.faq-group {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tg-hint);
+  margin: 20px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.faq-group:first-of-type { margin-top: 12px; }
+
+.faq {
+  background: var(--tg-secondary-bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.faq summary {
+  padding: 12px 14px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  list-style: none;
+  position: relative;
+  padding-right: 36px;
+}
+
+.faq summary::-webkit-details-marker { display: none; }
+
+.faq summary::after {
+  content: "+";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--tg-hint);
+  transition: transform 0.2s;
+}
+
+.faq[open] summary::after {
+  content: "−";
+}
+
+.faq-body {
+  padding: 0 14px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--tg-text);
+}
+
+.faq-body code {
+  background: var(--tg-bg);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.faq-body b {
+  font-weight: 600;
+}
+
 /* ─── DIALOG ─── */
 dialog {
   border: none;
